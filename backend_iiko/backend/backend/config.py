@@ -18,3 +18,7 @@ EMAIL_USER = os.environ.get("EMAIL_HOST_USER")
 EMAIL_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
 EM_PORT = os.environ.get("EMAIL_PORT")
 EM_HOST = os.environ.get("EMAIL_HOST")
+
+# Django
+FRONTEND_URL = os.environ.get("FRONTEND_URL")
+DJANGO_SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
