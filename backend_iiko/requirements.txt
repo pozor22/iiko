@@ -8,6 +8,7 @@ inflection==0.5.1
 jsonschema==4.23.0
 jsonschema-specifications==2024.10.1
 psycopg2-binary==2.9.10
+python-dotenv==0.21.0
 PyYAML==6.0.2
 referencing==0.36.2
 rpds-py==0.22.3

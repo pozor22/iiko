@@ -91,7 +91,6 @@ DATABASES = {
         'NAME': DB_NAME,
         'USER': DB_USER,
         'PASSWORD': DB_PASS,
-        'PORT': DB_PORT,
     }
 }
 
