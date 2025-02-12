@@ -1,5 +1,6 @@
 services:
   backend:
+    container_name: backend
     build:
       context: ./backend_iiko
     ports:
@@ -16,16 +17,16 @@ services:
       - database
 
   database:
+    container_name: db
     image: postgres:14.6-alpine
     env_file:
       - .env
-
     ports:
       - "5433:5432"
 
   redis:
     image: redis:latest
-    container_name: iiko_redis
+    container_name: redis
     restart: always
     env_file:
       - .env
