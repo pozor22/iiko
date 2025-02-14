@@ -36,5 +36,23 @@ services:
     volumes:
       - redis_data:/data
 
+  worker:
+    build:
+      context: ./backend_iiko
+    container_name: celery
+    hostname: worker
+    entrypoint: celery
+    working_dir: /backend
+    command: -A backend worker --loglevel=info
+    volumes:
+      - ./backend_iiko/backend:/backend
+    links:
+      - redis
+    depends_on:
+      - redis
+      - database
+    env_file:
+      - ./backend_iiko/.env
+
 volumes:
   redis_data:

@@ -11,7 +11,9 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 
 from pathlib import Path
-from .config import (DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT,
+from datetime import timedelta
+
+from .config import (DB_HOST, DB_NAME, DB_USER, DB_PASS,
                      EMAIL_USER, EMAIL_PASSWORD, EM_PORT, EM_HOST,
                      REDIS_URL, FRONTEND_URL, DJANGO_SECRET_KEY)
 
@@ -35,7 +37,12 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     'rest_framework',
+    'rest_framework_simplejwt',
     'corsheaders',
+    'drf_spectacular',
+    'django_celery_results',
+    'django_celery_beat',
+
     'core',
 
     'django.contrib.admin',
@@ -136,4 +143,44 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Брокер сообщений (Redis)
+CELERY_BROKER_URL = REDIS_URL
+
+# База данных для результатов
+CELERY_RESULT_BACKEND = 'django-db'
+
+# Другие настройки (по желанию)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+
+# Настройки почты
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = EM_HOST
+EMAIL_PORT = EM_PORT
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = EMAIL_USER
+EMAIL_HOST_PASSWORD = EMAIL_PASSWORD
+
 AUTH_USER_MODEL = 'core.User'
+
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',  # Включает интерактивный UI
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),  # Время жизни токена
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'API Documentation',
+    'DESCRIPTION': 'Документация для API пользователей',
+    'VERSION': 'v1',
+}
