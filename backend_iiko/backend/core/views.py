@@ -2,12 +2,15 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
+from django.utils.http import urlsafe_base64_decode
 
 from .models import User
 from .serializers import (GetUserSerializer, RegistrationUserRequestSerializer,
-                          RegistrationUserResponsesSerializer, LoginSerializer)
+                          RegistrationUserResponsesSerializer, LoginSerializer,
+                          UserConfirmSerializer)
 from .tasks import send_email_active_account
 
 
@@ -16,7 +19,7 @@ from .tasks import send_email_active_account
 @permission_classes([IsAuthenticated])
 def get_self_user(request):
     user = request.user
-    serializer = GetUserSerializer(user, many=True)
+    serializer = GetUserSerializer(user)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -53,6 +56,24 @@ def create_user(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(tags=['auth'])
+@api_view(['GET'])
+def email_confirmed(request, uidb64, token):
+    try:
+        uid = urlsafe_base64_decode(uidb64)
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user is not None and default_token_generator.check_token(user, token):
+        user.is_active = True
+        user.save()
+
+        serializer = GetUserSerializer(user)
+
+        return Response({'message': 'Email confirmed', **serializer.data}, status=status.HTTP_200_OK)
+    else:
+        return Response({'message': 'Email confirmation failed'}, status=status.HTTP_400_BAD_REQUEST)
 
 # class UserConfirmEmailView(View):
 #     def get(self, request, uidb64, token):
