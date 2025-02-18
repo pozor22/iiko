@@ -18,6 +18,7 @@ from .tasks import send_email_active_account, send_email_code
 
 ### Users
 @extend_schema(
+    summary='Регистрация нового пользователя',
     request=RegistrationUserRequestSerializer,
     tags=['Users'])
 @api_view(['POST'])
@@ -38,15 +39,16 @@ def create_user(request):
 
 
 @extend_schema(
+    summary='Получение списка пользователей с фильтрами',
+    description='Если ничего не указать, вернет текущего пользователя, можно указать pk для одного пользователя,\
+     можно указать role для всех пользователей с этой ролью, можно указать many=True для всех пользователей',
     tags=['Users'],
     parameters=[
         OpenApiParameter(name='many', type=bool,
                          description='Default False. If true, return all users with filter. /'
                                      'If false, return one user.', required=False),
         OpenApiParameter(name='pk', type=int, description='User id, only many==false', required=False),
-        OpenApiParameter(name='role', type=str, description='Filter for role, only many==true', required=False),
-    ]
-)
+        OpenApiParameter(name='role', type=str, description='Filter for role, only many==true', required=False)])
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_users(request):
@@ -80,18 +82,17 @@ def get_users(request):
 
 
 @extend_schema(tags=['Users'],
-                 parameters=[
-                     OpenApiParameter(name='pk', type=int, description='User id', required=False),
-                     OpenApiParameter(name='username', type=str, description='Username', required=False),
-                     OpenApiParameter(name='email', type=str, description='Email', required=False),
-                 ]
-)
+    summary='Удаление пользователя',
+    parameters=[
+        OpenApiParameter(name='pk', type=int, description='User id', required=False),
+        OpenApiParameter(name='username', type=str, description='Username', required=False),
+        OpenApiParameter(name='email', type=str, description='Email', required=False)])
 @api_view(['DELETE'])
 @permission_classes([IsAdminUser, IsAuthenticated])
 def delete_user(request):
-    pk = request.query_params.get('pk', None)
-    username = request.query_params.get('username', None)
-    email = request.query_params.get('email', None)
+    pk: int = request.query_params.get('pk', None)
+    username: str = request.query_params.get('username', None)
+    email: str = request.query_params.get('email', None)
 
     if pk:
         user = User.objects.filter(pk=pk).first()
@@ -114,6 +115,7 @@ def delete_user(request):
 
 ### Auth
 @extend_schema(
+    summary='Классическая авторизация пользователя по имени и паролю',
     request=LoginSerializer,
     tags=['Auth'])
 @api_view(['POST'])
@@ -127,6 +129,7 @@ def login_user(request):
 
 
 @extend_schema(
+    summary='Авторизация пользователя по коду',
     request=LoginWithCodeSerializer,
     tags=['Auth'])
 @api_view(['POST'])
@@ -140,6 +143,7 @@ def login_user_with_code(request):
 
 
 @extend_schema(
+    summary='Обновление access и refresh токенов',
     request=RefreshTokenSerializer,
     tags=['Auth']
 )
@@ -154,10 +158,15 @@ def refresh_token(request):
 
 
 ### Change
-@extend_schema(tags=['Change_user'], request=ChangeUsernameOrEmail)
+@extend_schema(
+    summary='Смена имени или почты пользователя',
+    description='Можно сменить только имя или только почту, так же можно сменить и имя и почту'
+                'если менять почту, то на новую почту будет отправлено письмо для подтверждения',
+    tags=['Change_user'],
+    request=ChangeUsernameOrEmail)
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
-def change_username(request):
+def change_username_or_email(request):
     user = request.user
     serializer = ChangeUsernameOrEmail(user, data=request.data, partial=True)
     if serializer.is_valid():
@@ -187,7 +196,11 @@ def change_username(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@extend_schema(tags=['Change_user'], request=ChangePasswordSerializer)
+@extend_schema(
+    summary='Смена пароля пользователя',
+    description='При смене пароля, на почту прийдет код для подтверждения',
+    tags=['Change_user'],
+    request=ChangePasswordSerializer)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def change_password(request):
@@ -210,7 +223,10 @@ def change_password(request):
 
 
 ### Confirm
-@extend_schema(tags=['Confirm'], request=ConfirmPasswordChangeSerializer)
+@extend_schema(
+    summary='Подтверждение смены пароля по коду',
+    tags=['Confirm'],
+    request=ConfirmPasswordChangeSerializer)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def confirm_password_change(request):
@@ -230,7 +246,9 @@ def confirm_password_change(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@extend_schema(tags=['Confirm'])
+@extend_schema(
+    summary='Повторная отправка кода для смены пароля',
+    tags=['Confirm'])
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def resend_code(request):
@@ -242,7 +260,9 @@ def resend_code(request):
     return Response({'message': 'Код подтверждения отправлен на email'}, status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['Confirm'])
+@extend_schema(
+    summary='Подтверждение почты и активация пользователя',
+    tags=['Confirm'])
 @api_view(['GET'])
 def email_confirmed(request, uidb64, token):
     try:

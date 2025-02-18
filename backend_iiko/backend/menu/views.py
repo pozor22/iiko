@@ -46,6 +46,13 @@ class ProductViewSet(ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = GetProductSerializer
 
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAdminUser]
+        return [permission() for permission in permission_classes]
+
 
 @extend_schema_view(
     list=extend_schema(
@@ -83,6 +90,12 @@ class CategoryViewSet(ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = GetCategorySerializer
 
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAdminUser]
+        return [permission() for permission in permission_classes]
 
 
 @extend_schema_view(
@@ -120,3 +133,10 @@ class CategoryViewSet(ModelViewSet):
 class KitchenViewSet(ModelViewSet):
     queryset = Kitchen.objects.all()
     serializer_class = GetKitchenSerializer
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAdminUser]
+        return [permission() for permission in permission_classes]
