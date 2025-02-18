@@ -12,20 +12,6 @@ class GetUserSerializer(serializers.ModelSerializer):
         fields = ['id', 'email', 'username', 'code', 'is_active']
 
 
-class DeleteUserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id']
-        extra_kwargs = {
-            'id': {'write_only': True}
-        }
-
-    def delete(self):
-        user = self.context['request'].user
-        user.delete()
-        return user
-
-
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField()

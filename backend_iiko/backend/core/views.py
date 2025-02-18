@@ -12,8 +12,7 @@ from .models import User, PasswordChangeConfirmation
 from .serializers import (GetUserSerializer, RegistrationUserRequestSerializer,
                           LoginSerializer, LoginWithCodeSerializer,
                           ChangeUsernameOrEmail, RefreshTokenSerializer,
-                          ChangePasswordSerializer, ConfirmPasswordChangeSerializer,
-                          DeleteUserSerializer)
+                          ChangePasswordSerializer, ConfirmPasswordChangeSerializer,)
 from .tasks import send_email_active_account, send_email_code
 
 
