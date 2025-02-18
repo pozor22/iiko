@@ -184,3 +184,8 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Документация для API пользователей',
     'VERSION': 'v1',
 }
+
+AUTHENTICATION_BACKENDS = [
+    'core.utils.CodeAuthenticationBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]

@@ -2,13 +2,13 @@ services:
   backend:
     container_name: backend
     build:
-      context: ./backend_iiko
+      context: backend_iiko
     ports:
       - "8000:8000"
     volumes:
       - ./backend_iiko/backend:/backend
     env_file:
-      - ./backend_iiko/.env
+      - backend_iiko/.env
 
     command: >
       sh -c "python manage.py runserver 0.0.0.0:8000"
@@ -38,7 +38,7 @@ services:
 
   worker:
     build:
-      context: ./backend_iiko
+      context: backend_iiko
     container_name: celery
     hostname: worker
     entrypoint: celery
@@ -52,7 +52,7 @@ services:
       - redis
       - database
     env_file:
-      - ./backend_iiko/.env
+      - backend_iiko/.env
 
 volumes:
   redis_data:
