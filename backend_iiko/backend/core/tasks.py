@@ -30,3 +30,24 @@ def send_email_active_account(user_id, domain):
         )
     except User.DoesNotExist:
         pass
+
+
+@shared_task
+def send_email_code(user_id, code):
+    try:
+        user = User.objects.get(id=user_id)
+
+        mail_subject = 'Подтвердите смену пароля'
+        message = render_to_string('core/email_code.html', {
+            'user': user,
+            'code': code,
+        })
+        send_mail(
+            mail_subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+            fail_silently=False,
+        )
+    except User.DoesNotExist:
+        print(f"User with id {user_id} does not exist")

@@ -12,6 +12,20 @@ class GetUserSerializer(serializers.ModelSerializer):
         fields = ['id', 'email', 'username', 'code', 'is_active']
 
 
+class DeleteUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id']
+        extra_kwargs = {
+            'id': {'write_only': True}
+        }
+
+    def delete(self):
+        user = self.context['request'].user
+        user.delete()
+        return user
+
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField()
@@ -32,11 +46,7 @@ class LoginSerializer(serializers.Serializer):
         return {
             "access": str(refresh.access_token),
             "refresh": str(refresh),
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "username": user.username,
-            }
+            "user": GetUserSerializer(user).data
         }
 
 
@@ -58,12 +68,25 @@ class LoginWithCodeSerializer(serializers.Serializer):
         return {
             "access": str(refresh.access_token),
             "refresh": str(refresh),
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "username": user.username,
-            }
+            "user": GetUserSerializer(user).data
         }
+
+
+class RefreshTokenSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+    def validate(self, attrs):
+        token = attrs.get('token')
+        try:
+            refresh = RefreshToken(token)
+            user = User.objects.get(id=refresh['user_id'])
+            return {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "user": GetUserSerializer(user).data
+            }
+        except Exception as e:
+            raise serializers.ValidationError('Invalid token')
 
 
 class RegistrationUserRequestSerializer(serializers.ModelSerializer):
@@ -81,12 +104,6 @@ class RegistrationUserRequestSerializer(serializers.ModelSerializer):
         return user
 
 
-class RegistrationUserResponsesSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id', 'email', 'username', 'is_active']
-
-
 ### Change
 class ChangeUsernameOrEmail(serializers.ModelSerializer):
     class Meta:
@@ -97,14 +114,64 @@ class ChangeUsernameOrEmail(serializers.ModelSerializer):
             'email': {'required': False}
         }
 
+    def validate_username(self, value):
+        if value == "":
+            return None
+        return value
+
+    def validate_email(self, value):
+        if value == "":
+            return None
+        return value
+
     def update(self, instance, validated_data):
         username = validated_data.get('username')
         email = validated_data.get('email')
 
-        if username:
+        if username is not None:
             instance.username = username
-        if email:
+        if email is not None:
             instance.email = email
             instance.is_active = False
         instance.save()
         return instance
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True)
+    confirm_new_password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        old_password = attrs.get('old_password')
+        new_password = attrs.get('new_password')
+        confirm_new_password = attrs.get('confirm_new_password')
+
+        if new_password != confirm_new_password:
+            raise serializers.ValidationError('Passwords do not match')
+
+        user = authenticate(username=self.context['request'].user.username, password=old_password)
+
+        if not user:
+            raise serializers.ValidationError('Invalid password')
+
+        return attrs
+
+
+class ConfirmPasswordChangeSerializer(serializers.Serializer):
+    code = serializers.CharField()
+
+    def validate_code(self, value):
+        user = self.context['request'].user
+        confirmation = getattr(user, "password_change_confirmation", None)
+
+        if not confirmation:
+            raise serializers.ValidationError('Код не найден')
+
+        if confirmation.code != value:
+            raise serializers.ValidationError('Неверный код')
+
+        if not confirmation.is_code_valid():
+            raise serializers.ValidationError('Код устарел')
+
+        return value
