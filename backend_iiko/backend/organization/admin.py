@@ -1,3 +1,7 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import Organization, Chain, Restaurant
+
+admin.site.register(Organization)
+admin.site.register(Chain)
+admin.site.register(Restaurant)
