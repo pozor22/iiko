@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 
     'core',
     'menu',
+    'organization',
 
     'django.contrib.admin',
     'django.contrib.auth',

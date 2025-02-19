@@ -22,10 +22,10 @@ class Product(models.Model):
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
     kitchen = models.ForeignKey(Kitchen, on_delete=models.CASCADE)
     stop = models.BooleanField(default=False)
-    count = models.PositiveIntegerField(default=1)
+    count = models.PositiveIntegerField(default=None, null=True)
 
-    def buy_stop(self):
-        if self.stop:
+    def buy(self):
+        if not self.count is None:
             self.count -= 1
             self.save()
 
