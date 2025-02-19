@@ -7,9 +7,9 @@ class User(AbstractUser):
     email = models.EmailField(unique=True, blank=True)
     code = models.IntegerField(unique=True, blank=True, null=True)
 
-    organizations = models.ManyToManyField('organization.Organization', related_name='users')
-    chains = models.ManyToManyField('organization.Chain', related_name='users')
-    restaurants = models.ManyToManyField('organization.Restaurant', related_name='users')
+    organizations = models.ManyToManyField('organization.Organization', related_name='users', blank=True)
+    chains = models.ManyToManyField('organization.Chain', related_name='users', blank=True)
+    restaurants = models.ManyToManyField('organization.Restaurant', related_name='users', blank=True)
 
     def save(self, *args, **kwargs):
         if not self.code:

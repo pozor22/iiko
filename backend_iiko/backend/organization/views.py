@@ -19,6 +19,10 @@ from core.models import User
         summary="Получить список организаций",
         description="Возвращает список всех организаций.",
         tags=['Organization'],
+        parameters=[
+            OpenApiParameter(name='my_organization', type=bool,
+                             description='Если True, возвращает только организации, где текущий пользователь является автором.')
+        ]
     ),
     retrieve=extend_schema(
         summary="Получить детали организации",
@@ -50,20 +54,25 @@ from core.models import User
         description="Позволяет текущим авторам добавлять новых авторов в организацию.",
         tags=['Organization'],
     ),
-    my_organizations=extend_schema(
-        summary="Получить мои организации",
-        description="Возвращает организации, где текущий пользователь является автором.",
-        tags=['Organization'],
-    ),
 )
 class OrganizationViewSet(ModelViewSet):
     queryset = Organization.objects.all()
     serializer_class = GetOrganizationSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
 
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAuthorOrReadOnly])
-    def my_organizations(self, request):
-        queryset = self.get_queryset().filter(authors=request.user)
+    def list(self, request, *args, **kwargs):
+        my_organization = request.query_params.get('my_organization', False)
+
+        if my_organization:
+            queryset = self.get_queryset().filter(authors=request.user)
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
