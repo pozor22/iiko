@@ -10,7 +10,7 @@ class Organization(models.Model):
 
 
 class Chain(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, unique=True)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='chains')
 
     def __str__(self):
@@ -18,7 +18,7 @@ class Chain(models.Model):
 
 
 class Restaurant(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, unique=True)
     chain = models.ForeignKey(Chain, on_delete=models.CASCADE, related_name='restaurants')
 
     def __str__(self):

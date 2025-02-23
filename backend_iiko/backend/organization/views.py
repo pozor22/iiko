@@ -1,17 +1,15 @@
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-from rest_framework import status
+from rest_framework import status, serializers
 from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema_view
-from django.contrib.sites.shortcuts import get_current_site
 
 from .models import Organization, Chain, Restaurant
-from .permissions import IsAuthorOrReadOnly
+from .permissions import IsAuthorOrReadOnly, IsAuthorInChainOrReadOnly
 from .serializers import (GetOrganizationSerializer, GetChainSerializer,
-                          GetRestaurantSerializer, PostAddAuthorSerializer)
-
-from core.models import User
+                          GetRestaurantSerializer, PostAddAuthorSerializer,
+                          PatchChainSerializer, PostChainSerializer)
 
 
 @extend_schema_view(
@@ -50,6 +48,11 @@ from core.models import User
         tags=['Organization'],
         request=PostAddAuthorSerializer,
     ),
+    delete_author=extend_schema(
+        summary="Удалить автора из организации",
+        description="Позволяет удалить текущего пользователя из организации",
+        tags=['Organization'],
+    ),
 )
 class OrganizationViewSet(ModelViewSet):
     queryset = Organization.objects.all()
@@ -68,7 +71,7 @@ class OrganizationViewSet(ModelViewSet):
         if my_organization:
             queryset = self.get_queryset().filter(authors=request.user)
         else:
-            queryset = self.filter_queryset(self.get_queryset())
+            queryset = self.get_queryset()
 
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -87,3 +90,111 @@ class OrganizationViewSet(ModelViewSet):
             return Response(result, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['delete'], permission_classes=[IsAuthenticated, IsAuthorOrReadOnly])
+    def delete_author(self, request, pk: int):
+        organization = Organization.objects.filter(id=pk).first()
+
+        if not organization:
+            return Response({'error': 'Organization not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user not in organization.authors.all():
+            return Response({'error': 'You are not an author of this organization'}, status=status.HTTP_403_FORBIDDEN)
+
+        organization.authors.remove(request.user)
+        return Response({'message': f'Author {request.user.username} deleted',
+                             **GetOrganizationSerializer(organization).data}, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Получить список сетей",
+        description="Возвращает список всех сетей.",
+        tags=['Chain'],
+        parameters=[
+            OpenApiParameter(name='my_chain', type=bool,
+                             description='Если True, возвращает только сети, где текущий пользователь является автором.')
+        ]
+    ),
+    retrieve=extend_schema(
+        summary="Получить детали сети",
+        description="Возвращает информацию о конкретной сети по её ID.",
+        tags=['Chain'],
+    ),
+    create=extend_schema(
+        summary="Создать новую сеть",
+        description="Создает новую сеть.",
+        tags=['Chain'],
+        request=PostChainSerializer,
+    ),
+    partial_update=extend_schema(
+        summary="Частично обновить сеть",
+        description="Можно обновить имя или организацию сети по отдельности.",
+        tags=['Chain'],
+        request=PatchChainSerializer,
+    ),
+    destroy=extend_schema(
+        summary="Удалить сеть",
+        description="Удаляет сеть по её ID.",
+        tags=['Chain'],
+    ),
+)
+class ChainViewSet(ModelViewSet):
+    queryset = Chain.objects.all()
+    serializer_class = GetChainSerializer
+    permission_classes = [IsAuthenticated, IsAuthorInChainOrReadOnly]
+    http_method_names = ['get', 'post', 'patch', 'delete']
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return PostChainSerializer
+        if self.action == 'partial_update':
+            return PatchChainSerializer
+        return GetChainSerializer
+
+    def get_object(self):
+        obj = super().get_object()
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+    def list(self, request, *args, **kwargs):
+        my_chain = request.query_params.get('my_chain', '').lower() == 'true'
+
+        if my_chain:
+            queryset = self.get_queryset().filter(organization__authors=request.user)
+        else:
+            queryset = self.get_queryset()
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        organization_id = request.data.get('organization')
+
+        if Organization.objects.filter(id=organization_id, authors=request.user).exists():
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(GetChainSerializer(serializer.instance).data, status=status.HTTP_201_CREATED, headers=headers)
+        else:
+            return Response({'error': 'You are not an author of this organization'}, status=status.HTTP_403_FORBIDDEN)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(GetChainSerializer(serializer.instance).data)

@@ -8,6 +8,7 @@ from .models import Organization, Chain, Restaurant
 from core.serializers import GetUserSerializer
 from core.models import User
 
+
 class GetOrganizationSerializer(serializers.ModelSerializer):
     authors = GetUserSerializer(many=True, read_only=True)
 
@@ -43,6 +44,9 @@ class PostAddAuthorSerializer(serializers.Serializer):
         if user is None:
             raise serializers.ValidationError('User not found')
 
+        if user == author:
+            raise serializers.ValidationError('You can not add yourself to organization')
+
         if organization is None:
             raise serializers.ValidationError('Organization not found')
 
@@ -70,12 +74,26 @@ class PostAddAuthorSerializer(serializers.Serializer):
         }
 
 
-
-
 class GetChainSerializer(serializers.ModelSerializer):
+    organization = GetOrganizationSerializer()
+
     class Meta:
         model = Chain
-        fields = '__all__'
+        fields = ['id', 'name', 'organization']
+
+
+class PostChainSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Chain
+        fields = ['id', 'name', 'organization']
+
+
+class PatchChainSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Chain
+        fields = ['id', 'name', 'organization']
 
 
 class GetRestaurantSerializer(serializers.ModelSerializer):
