@@ -15,7 +15,7 @@ from datetime import timedelta
 
 from .config import (DB_HOST, DB_NAME, DB_USER, DB_PASS,
                      EMAIL_USER, EMAIL_PASSWORD, EM_PORT, EM_HOST,
-                     REDIS_URL, FRONTEND_URL, DJANGO_SECRET_KEY)
+                     REDIS_URL, DJANGO_SECRET_KEY)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -66,9 +66,17 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    FRONTEND_URL,   # Фронтенд в разработке
+CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_HEADERS = [
+    'content-type',
+    'authorization',
+    'x-requested-with',
 ]
+
+CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 
 ROOT_URLCONF = 'backend.urls'
 
