@@ -55,7 +55,8 @@ dependencies = [
     "tzdata (==2025.1)",
     "uritemplate (==4.1.1)",
     "vine (==5.1.0)",
-    "wcwidth (==0.2.13)"
+    "wcwidth (==0.2.13)",
+    "django-filter (>=25.1,<26.0)"
 ]
 
 

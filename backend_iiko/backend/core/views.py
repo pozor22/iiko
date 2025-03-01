@@ -1,12 +1,14 @@
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 from rest_framework import status
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema_view
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.sites.shortcuts import get_current_site
 from django.utils.http import urlsafe_base64_decode
+from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import User, PasswordChangeConfirmation
 from .serializers import (GetUserSerializer, RegistrationUserRequestSerializer,
@@ -14,269 +16,211 @@ from .serializers import (GetUserSerializer, RegistrationUserRequestSerializer,
                           ChangeUsernameOrEmail, RefreshTokenSerializer,
                           ChangePasswordSerializer, ConfirmPasswordChangeSerializer,)
 from .tasks import send_email_active_account, send_email_code
+from .filters import UserFilter
 
 
-### Users
-@extend_schema(
-    summary='Регистрация нового пользователя',
-    request=RegistrationUserRequestSerializer,
-    tags=['Users'])
-@api_view(['POST'])
-def create_user(request):
-    serializer = RegistrationUserRequestSerializer(data=request.data)
-    if serializer.is_valid():
-        user = serializer.save()
-
-        current_site = get_current_site(request)
-        domain = current_site.domain
-        send_email_active_account.delay(user.id, domain)
-
-        response = GetUserSerializer(user)
-
-        return Response(response.data, status=status.HTTP_201_CREATED)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@extend_schema(
-    summary='Получение списка пользователей с фильтрами',
-    description='Если ничего не указать, вернет текущего пользователя, можно указать pk для одного пользователя,\
-     можно указать role для всех пользователей с этой ролью, можно указать many=True для всех пользователей',
-    tags=['Users'],
-    parameters=[
-        OpenApiParameter(name='many', type=bool,
-                         description='Default False. If true, return all users with filter. /'
-                                     'If false, return one user.', required=False),
-        OpenApiParameter(name='pk', type=int, description='User id, only many==false', required=False),
-        OpenApiParameter(name='role', type=str, description='Filter for role, only many==true', required=False)])
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_users(request):
-    many: bool = request.query_params.get('many', False)
-
-    if many:
-        pk: int = request.query_params.get('pk', None)
-        if pk:
-            return Response({'message': 'You cannot fill in the pk field together with many==True'},
-                            status=status.HTTP_404_NOT_FOUND)
-        else:
-            role: str = request.query_params.get('role', None)
-            if role:
-                users = User.objects.filter(groups__name=role)
-            else:
-                users = User.objects.all()
-            serializer = GetUserSerializer(users, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-    else:
-        pk: int = request.query_params.get('pk', None)
-        if pk:
-            user = User.objects.filter(pk=pk).first()
-            if user:
-                serializer = GetUserSerializer(user)
-                return Response(serializer.data, status=status.HTTP_200_OK)
-            return Response({'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            user = request.user
-            serializer = GetUserSerializer(user)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-@extend_schema(tags=['Users'],
-    summary='Удаление пользователя',
-    parameters=[
-        OpenApiParameter(name='pk', type=int, description='User id', required=False),
-        OpenApiParameter(name='username', type=str, description='Username', required=False),
-        OpenApiParameter(name='email', type=str, description='Email', required=False)])
-@api_view(['DELETE'])
-@permission_classes([IsAdminUser, IsAuthenticated])
-def delete_user(request):
-    pk: int = request.query_params.get('pk', None)
-    username: str = request.query_params.get('username', None)
-    email: str = request.query_params.get('email', None)
-
-    if pk:
-        user = User.objects.filter(pk=pk).first()
-        user.delete()
-        response = GetUserSerializer(user)
-        return Response({'message': 'User deleted', **response.data}, status=status.HTTP_200_OK)
-    elif username:
-        user = User.objects.filter(username=username).first()
-        user.delete()
-        response = GetUserSerializer(user)
-        return Response({'message': 'User deleted', **response.data}, status=status.HTTP_200_OK)
-    elif email:
-        user = User.objects.filter(email=email).first()
-        user.delete()
-        response = GetUserSerializer(user)
-        return Response({'message': 'User deleted', **response.data}, status=status.HTTP_200_OK)
-
-    return Response({'message': 'This endpoint needs to be deleted'}, status=status.HTTP_200_OK)
-
-
-### Auth
-@extend_schema(
-    summary='Классическая авторизация пользователя по имени и паролю',
-    request=LoginSerializer,
-    tags=['Auth'])
-@api_view(['POST'])
-def login_user(request):
-    serializer = LoginSerializer(data=request.data)
-    if serializer.is_valid():
-        data = serializer.validated_data
-        return Response(data, status=status.HTTP_200_OK)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@extend_schema(
-    summary='Авторизация пользователя по коду',
-    request=LoginWithCodeSerializer,
-    tags=['Auth'])
-@api_view(['POST'])
-def login_user_with_code(request):
-    serializer = LoginWithCodeSerializer(data=request.data)
-    if serializer.is_valid():
-        data = serializer.validated_data
-        return Response(data, status=status.HTTP_200_OK)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@extend_schema(
-    summary='Обновление access и refresh токенов',
-    request=RefreshTokenSerializer,
-    tags=['Auth']
-)
-@api_view(['POST'])
-def refresh_token(request):
-    serializer = RefreshTokenSerializer(data=request.data)
-    if serializer.is_valid():
-        data = serializer.validated_data
-        return Response(data, status=status.HTTP_200_OK)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-### Change
-@extend_schema(
-    summary='Смена имени или почты пользователя',
-    description='Можно сменить только имя или только почту, так же можно сменить и имя и почту'
+@extend_schema_view(
+    list=extend_schema(
+        summary="Получить список пользователей",
+        description="Можно получить список всех пользователей, так же можно фильтровать по ролям, организациям, цепочкам и ресторанам",
+        tags=['Users'],
+        parameters=[
+            OpenApiParameter(name='role', type=str, description='Filter for role, only many==true', required=False),
+            OpenApiParameter(name='organizations', type=str, description='Filter for role, only many==true', required=False),
+            OpenApiParameter(name='chains', type=str, description='Filter for role, only many==true', required=False),
+            OpenApiParameter(name='restaurants', type=str, description='Filter for role, only many==true', required=False),]),
+    retrieve=extend_schema(
+        summary="Получить одного пользователя",
+        description="Возвращает пользователя по его ID",
+        tags=['Users'],),
+    create=extend_schema(
+        summary='Регистрация нового пользователя',
+        description="Регистрация нового пользователя",
+        tags=['Users'],
+        request=RegistrationUserRequestSerializer,),
+    destroy=extend_schema(
+        summary="Удалить пользователя",
+        description="Удаляет пользователя по её ID.",
+        tags=['Users'],),
+    login_user=extend_schema(
+        summary='Авторизация пользователя',
+        description="Авторизация пользователя по email и паролю",
+        request=LoginSerializer,
+        tags=['Users']),
+    login_user_with_code=extend_schema(
+        summary='Авторизация пользователя по коду',
+        description="Авторизация пользователя по коду",
+        request=LoginWithCodeSerializer,
+        tags=['Users']),
+    refresh_token=extend_schema(
+        summary='Обновление access и refresh токенов',
+        description='Обновление access и refresh токенов',
+        request=RefreshTokenSerializer,
+        tags=['Users']),
+    confirm_password_change=extend_schema(
+        summary='Подтверждение смены пароля по коду',
+        description='Подтверждение смены пароля по коду',
+        tags=['Users'],
+        request=ConfirmPasswordChangeSerializer),
+    resend_code=extend_schema(
+        summary='Повторная отправка кода для смены пароля',
+        description='Повторная отправка кода для смены пароля',
+        tags=['Users']),
+    email_confirmed=extend_schema(
+        summary='Подтверждение почты и активация пользователя',
+        description='Подтверждение почты и активация пользователя',
+        tags=['Users']),
+    change_username_or_email=extend_schema(
+        summary='Смена имени или почты пользователя',
+        description='Можно сменить только имя или только почту, так же можно сменить и имя и почту'
                 'если менять почту, то на новую почту будет отправлено письмо для подтверждения',
-    tags=['Change_user'],
-    request=ChangeUsernameOrEmail)
-@api_view(['PATCH'])
-@permission_classes([IsAuthenticated])
-def change_username_or_email(request):
-    user = request.user
-    serializer = ChangeUsernameOrEmail(user, data=request.data, partial=True)
-    if serializer.is_valid():
-        if serializer.validated_data.get('username') and serializer.validated_data.get('email'):
-            serializer.save()
-            user = request.user
-            serializer = GetUserSerializer(user)
+        tags=['Users'],
+        request=ChangeUsernameOrEmail),
+    change_password=extend_schema(
+        summary='Смена пароля пользователя',
+        description='При смене пароля, на почту прийдет код для подтверждения',
+        tags=['Users'],
+        request=ChangePasswordSerializer),
+)
+class UserViewSet(ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = GetUserSerializer
+    http_method_names = ['get', 'post', 'patch', 'delete']
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = UserFilter
+
+    def create(self, request, *args, **kwargs):
+        serializer = RegistrationUserRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+
             current_site = get_current_site(request)
             domain = current_site.domain
             send_email_active_account.delay(user.id, domain)
-            return Response({'message': 'Username and email changed', **serializer.data}, status=status.HTTP_200_OK)
-        elif serializer.validated_data.get('username'):
-            serializer.save()
+
+            response = GetUserSerializer(user)
+
+            return Response(response.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "PATCH не разрешен."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @action(detail=False, methods=['post'])
+    def login_user(self, request):
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():
+            data = serializer.validated_data
+            return Response(data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'])
+    def login_user_with_code(self, request):
+        serializer = LoginWithCodeSerializer(data=request.data)
+        if serializer.is_valid():
+            data = serializer.validated_data
+            return Response(data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'])
+    def refresh_token(self, request):
+        serializer = RefreshTokenSerializer(data=request.data)
+        if serializer.is_valid():
+            data = serializer.validated_data
+            return Response(data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def confirm_password_change(self, request):
+        serializer = ConfirmPasswordChangeSerializer(data=request.data, context={'request': request})
+
+        if serializer.is_valid():
             user = request.user
-            serializer = GetUserSerializer(user)
-            return Response({'message': 'Username changed', **serializer.data}, status=status.HTTP_200_OK)
-        else:
-            serializer.save()
-            user = request.user
-            serializer = GetUserSerializer(user)
-            current_site = get_current_site(request)
-            domain = current_site.domain
-            send_email_active_account.delay(user.id, domain)
-            return Response({'message': 'Email changed', **serializer.data}, status=status.HTTP_200_OK)
+            new_password = request.session.get('new_password')
 
+            if new_password:
+                user.set_password(new_password)
+                user.save()
+                update_session_auth_hash(request, user)
+                user.password_change_confirmation.delete()
+                return Response({'message': 'Пароль успешно изменен'}, status=status.HTTP_200_OK)
 
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-@extend_schema(
-    summary='Смена пароля пользователя',
-    description='При смене пароля, на почту прийдет код для подтверждения',
-    tags=['Change_user'],
-    request=ChangePasswordSerializer)
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def change_password(request):
-    serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
-    if serializer.is_valid():
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def resend_code(self, request):
         user = request.user
-        new_password = serializer.validated_data['new_password']
-
-        # Генерируем код и отправляем email
         confirmation, _ = PasswordChangeConfirmation.objects.get_or_create(user=user)
         confirmation.generate_confirmation_code()
         send_email_code.delay(user.id, confirmation.code)
 
-        # Сохраняем новый пароль в сессии
-        request.session['new_password'] = new_password
-
         return Response({'message': 'Код подтверждения отправлен на email'}, status=status.HTTP_200_OK)
 
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=['post'])
+    def email_confirmed(self, request, uidb64, token):
+        try:
+            uid = urlsafe_base64_decode(uidb64)
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
 
-
-### Confirm
-@extend_schema(
-    summary='Подтверждение смены пароля по коду',
-    tags=['Confirm'],
-    request=ConfirmPasswordChangeSerializer)
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def confirm_password_change(request):
-    serializer = ConfirmPasswordChangeSerializer(data=request.data, context={'request': request})
-
-    if serializer.is_valid():
-        user = request.user
-        new_password = request.session.get('new_password')
-
-        if new_password:
-            user.set_password(new_password)
+        if user is not None and default_token_generator.check_token(user, token):
+            user.is_active = True
             user.save()
-            update_session_auth_hash(request, user)
-            user.password_change_confirmation.delete()
-            return Response({'message': 'Пароль успешно изменен'}, status=status.HTTP_200_OK)
 
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            serializer = GetUserSerializer(user)
+            return Response({'message': 'Email confirmed', **serializer.data}, status=status.HTTP_200_OK)
+        else:
+            return Response({'message': 'Email confirmation failed'}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=['PATCH'], permission_classes=[IsAuthenticated])
+    def change_username_or_email(self, request):
+        user = request.user
+        serializer = ChangeUsernameOrEmail(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            if serializer.validated_data.get('username') and serializer.validated_data.get('email'):
+                serializer.save()
+                serializer = GetUserSerializer(user)
 
-@extend_schema(
-    summary='Повторная отправка кода для смены пароля',
-    tags=['Confirm'])
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def resend_code(request):
-    user = request.user
-    confirmation, _ = PasswordChangeConfirmation.objects.get_or_create(user=user)
-    confirmation.generate_confirmation_code()
-    send_email_code.delay(user.id, confirmation.code)
+                current_site = get_current_site(request)
+                domain = current_site.domain
+                send_email_active_account.delay(user.id, domain)
 
-    return Response({'message': 'Код подтверждения отправлен на email'}, status=status.HTTP_200_OK)
+                return Response({'message': 'Username and email changed', **serializer.data}, status=status.HTTP_200_OK)
+            elif serializer.validated_data.get('username'):
+                serializer.save()
+                serializer = GetUserSerializer(user)
 
+                return Response({'message': 'Username changed', **serializer.data}, status=status.HTTP_200_OK)
+            else:
+                serializer.save()
+                serializer = GetUserSerializer(user)
 
-@extend_schema(
-    summary='Подтверждение почты и активация пользователя',
-    tags=['Confirm'])
-@api_view(['GET'])
-def email_confirmed(request, uidb64, token):
-    try:
-        uid = urlsafe_base64_decode(uidb64)
-        user = User.objects.get(pk=uid)
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-        user = None
+                current_site = get_current_site(request)
+                domain = current_site.domain
+                send_email_active_account.delay(user.id, domain)
 
-    if user is not None and default_token_generator.check_token(user, token):
-        user.is_active = True
-        user.save()
+                return Response({'message': 'Email changed', **serializer.data}, status=status.HTTP_200_OK)
 
-        serializer = GetUserSerializer(user)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({'message': 'Email confirmed', **serializer.data}, status=status.HTTP_200_OK)
-    else:
-        return Response({'message': 'Email confirmation failed'}, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=['POST'], permission_classes=[IsAuthenticated])
+    def change_password(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            user = request.user
+            new_password = serializer.validated_data['new_password']
+
+            confirmation, _ = PasswordChangeConfirmation.objects.get_or_create(user=user)
+            confirmation.generate_confirmation_code()
+            send_email_code.delay(user.id, confirmation.code)
+
+            request.session['new_password'] = new_password
+
+            return Response({'message': 'Код подтверждения отправлен на email'}, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -3,13 +3,37 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.core.validators import MinValueValidator, MaxValueValidator
 
+from organization.models import Organization, Chain, Restaurant
+
 from .models import User
 
 
+class GetOrganizationUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        fields = ['id', 'name']
+
+
+class GetChainUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        fields = ['id', 'name']
+
+
+class GetRestaurantUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        fields = ['id', 'name']
+
+
 class GetUserSerializer(serializers.ModelSerializer):
+    organizations = GetOrganizationUserSerializer(many=True, read_only=True)
+    chains = GetChainUserSerializer(many=True, read_only=True)
+    restaurants = GetRestaurantUserSerializer(many=True, read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'code', 'is_active']
+        fields = ['id', 'email', 'username', 'code', 'organizations', 'chains', 'restaurants', 'is_active']
 
 
 class LoginSerializer(serializers.Serializer):
