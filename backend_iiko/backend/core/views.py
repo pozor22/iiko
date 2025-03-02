@@ -20,6 +20,7 @@ from .filters import UserFilter
 
 
 @extend_schema_view(
+    partial_update=extend_schema(exclude=True),
     list=extend_schema(
         summary="Получить список пользователей",
         description="Можно получить список всех пользователей, так же можно фильтровать по ролям, организациям, цепочкам и ресторанам",
@@ -46,30 +47,30 @@ from .filters import UserFilter
         summary='Авторизация пользователя',
         description="Авторизация пользователя по email и паролю",
         request=LoginSerializer,
-        tags=['Users']),
+        tags=['Auth']),
     login_user_with_code=extend_schema(
         summary='Авторизация пользователя по коду',
         description="Авторизация пользователя по коду",
         request=LoginWithCodeSerializer,
-        tags=['Users']),
+        tags=['Auth']),
     refresh_token=extend_schema(
         summary='Обновление access и refresh токенов',
         description='Обновление access и refresh токенов',
         request=RefreshTokenSerializer,
-        tags=['Users']),
+        tags=['Auth']),
     confirm_password_change=extend_schema(
         summary='Подтверждение смены пароля по коду',
         description='Подтверждение смены пароля по коду',
-        tags=['Users'],
+        tags=['Auth'],
         request=ConfirmPasswordChangeSerializer),
     resend_code=extend_schema(
         summary='Повторная отправка кода для смены пароля',
         description='Повторная отправка кода для смены пароля',
-        tags=['Users']),
+        tags=['Auth']),
     email_confirmed=extend_schema(
         summary='Подтверждение почты и активация пользователя',
         description='Подтверждение почты и активация пользователя',
-        tags=['Users']),
+        tags=['Auth']),
     change_username_or_email=extend_schema(
         summary='Смена имени или почты пользователя',
         description='Можно сменить только имя или только почту, так же можно сменить и имя и почту'

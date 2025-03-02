@@ -1,6 +1,3 @@
-from django.template.context_processors import request
-from django.views.decorators.http import require_GET
-from kombu.asynchronous.http import Response
 from rest_framework import serializers
 
 from .models import Organization, Chain, Restaurant
@@ -29,7 +26,8 @@ class GetOrganizationSerializer(serializers.ModelSerializer):
         raise serializers.ValidationError('User not found')
 
 
-class PostAddAuthorSerializer(serializers.Serializer):
+# Сериализотор для добавления автора в организацию или добавления пользователя в организацию
+class PostAddAuthorOrUserSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()
     organization_id = serializers.IntegerField()
 
@@ -58,17 +56,17 @@ class PostAddAuthorSerializer(serializers.Serializer):
 
 
     def create(self, validated_data):
-        user_id = validated_data.get('user_id')
-        organization_id = validated_data.get('organization_id')
+        user = User.objects.get(id=validated_data.get('user_id'))
+        organization = Organization.objects.get(id=validated_data.get('organization_id'))
 
-        user = User.objects.get(id=user_id)
-        organization = Organization.objects.get(id=organization_id)
+        if self.context.get('add_author'):
+            organization.authors.add(user)
+            user.organizations.add(organization)
 
-        organization.authors.add(user)
-        organization.save()
+        else:
+            user.organizations.add(organization)
 
         return {
-            'message': f'User {user.username} added to organization {organization.name}',
             'user': GetUserSerializer(user).data,
             'organization': GetOrganizationSerializer(organization).data
         }
@@ -82,14 +80,7 @@ class GetChainSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'organization']
 
 
-class PostChainSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Chain
-        fields = ['id', 'name', 'organization']
-
-
-class PatchChainSerializer(serializers.ModelSerializer):
+class PostPatchChainSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Chain
