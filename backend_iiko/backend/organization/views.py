@@ -26,10 +26,6 @@ from .serializers import (GetOrganizationSerializer, GetChainSerializer,
             OpenApiParameter(name='me_in_organization', type=bool,
                              description='Если True, возвращает только организации, где текущий пользователь находится в организациях.')
         ]),
-    get_users_in_organization=extend_schema(
-        summary="Получить список пользователей в организации",
-        description="Возвращает список пользователей в организации по ID организации.",
-        tags=['Organization']),
     retrieve=extend_schema(
         summary="Получить детали организации",
         description="Возвращает детали конкретной организации по её ID.",
@@ -107,16 +103,6 @@ class OrganizationViewSet(ModelViewSet):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
-
-    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
-    def get_users_in_organization(self, request, pk: int):
-        organization = Organization.objects.filter(id=pk).first()
-        if not organization:
-            return Response({'error': 'Organization not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        users = organization.users.all()
-        serializer = GetUserSerializer(users, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAuthorOrReadOnly])
     def add_author(self, request):

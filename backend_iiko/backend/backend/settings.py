@@ -192,9 +192,60 @@ SIMPLE_JWT = {
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'API Documentation',
-    'DESCRIPTION': 'Документация для API пользователей',
-    'VERSION': 'v1',
+    "TITLE": "API Iiko",
+    "DESCRIPTION": "API for iiko",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,  # Сохранять токен после обновления страницы
+        "deepLinking": True,
+    },
+    "SWAGGER_UI_EXTRA_CONFIGURATION": {
+        "requestInterceptor": """
+            function(req) {
+                if (req.url.includes('http://127.0.0.1:8000/api/users/user/login_user/')) {
+                    localStorage.setItem('jwt_token', JSON.stringify(req.body));
+                }
+                return req;
+            }
+        """,
+        "responseInterceptor": """
+            function(response) {
+                if (response.url.includes('http://127.0.0.1:8000/api/users/user/login_user/') && response.status === 200) { 
+                    let data;
+                    try {
+                        data = JSON.parse(response.text);
+                    } catch (e) {
+                        console.error("Failed to parse JSON response", e);
+                        return response;
+                    }
+                    let token = data.access;  // Извлекаем access-токен
+                    if (token) {
+                        let authHeader = "Bearer " + token;
+                        localStorage.setItem("jwt_token", authHeader);  // Сохраняем токен
+                        window.ui.preauthorizeApiKey("jwtAuth", authHeader);  // Авторизуем Swagger UI
+                    }
+                }
+                return response;
+            }
+        """,
+        "onComplete": """
+            function() {
+                let token = localStorage.getItem("jwt_token");
+                if (token && window.ui) {
+                    window.ui.preauthorizeApiKey("jwtAuth", token);  // Авторизуем Swagger UI
+                }
+            }
+        """,
+    },
+    "SECURITY_DEFINITIONS": {
+        "jwtAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "Authorization",
+            "description": "Введите JWT-токен в формате: Bearer <your_token>"
+        }
+    }
 }
 
 AUTHENTICATION_BACKENDS = [

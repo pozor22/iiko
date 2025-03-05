@@ -26,17 +26,17 @@ from .filters import UserFilter
         description="Можно получить список всех пользователей, так же можно фильтровать по ролям, организациям, цепочкам и ресторанам",
         tags=['Users'],
         parameters=[
-            OpenApiParameter(name='role', type=str, description='Filter for role, only many==true', required=False),
-            OpenApiParameter(name='organizations', type=str, description='Filter for role, only many==true', required=False),
-            OpenApiParameter(name='chains', type=str, description='Filter for role, only many==true', required=False),
-            OpenApiParameter(name='restaurants', type=str, description='Filter for role, only many==true', required=False),]),
+            OpenApiParameter(name='role', type=int, description='Filter for role, by name', required=False),
+            OpenApiParameter(name='organizations', type=int, description='Filter for organizations, by name', required=False),
+            OpenApiParameter(name='chains', type=int, description='Filter for chains, by name', required=False),
+            OpenApiParameter(name='restaurants', type=int, description='Filter for restaurants, by name', required=False),]),
     retrieve=extend_schema(
         summary="Получить одного пользователя",
         description="Возвращает пользователя по его ID",
         tags=['Users'],),
     create=extend_schema(
         summary='Регистрация нового пользователя',
-        description="Регистрация нового пользователя",
+        description="Регистрация нового пользователя, после регистрации на почту придет письмо для подтверждения",
         tags=['Users'],
         request=RegistrationUserRequestSerializer,),
     destroy=extend_schema(
@@ -45,7 +45,7 @@ from .filters import UserFilter
         tags=['Users'],),
     login_user=extend_schema(
         summary='Авторизация пользователя',
-        description="Авторизация пользователя по email и паролю",
+        description="Авторизация пользователя по username и паролю",
         request=LoginSerializer,
         tags=['Auth']),
     login_user_with_code=extend_schema(
@@ -60,7 +60,7 @@ from .filters import UserFilter
         tags=['Auth']),
     confirm_password_change=extend_schema(
         summary='Подтверждение смены пароля по коду',
-        description='Подтверждение смены пароля по коду',
+        description='Отправляет код, а пароль сохраняет в сессии, после подтверждения кода, пароль меняется',
         tags=['Auth'],
         request=ConfirmPasswordChangeSerializer),
     resend_code=extend_schema(
