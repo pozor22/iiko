@@ -12,7 +12,7 @@ from .models import Organization, Chain, Restaurant
 from .permissions import IsAuthorOrReadOnly, IsAuthorInChainOrReadOnly
 from .serializers import (GetOrganizationSerializer, GetChainSerializer,
                           GetRestaurantSerializer, PostAddAuthorOrUserSerializer,
-                          PostPatchChainSerializer)
+                          PostPatchChainSerializer, AddUserToChainSerializer)
 
 
 @extend_schema_view(
@@ -161,35 +161,47 @@ class OrganizationViewSet(ModelViewSet):
 @extend_schema_view(
     list=extend_schema(
         summary="Получить список сетей",
-        description="Возвращает список всех сетей.",
+        description="Возвращает список всех сетей. ",
         tags=['Chain'],
         parameters=[
             OpenApiParameter(name='my_chain', type=bool,
-                             description='Если True, возвращает только сети, где текущий пользователь является автором.')
-        ]
-    ),
+                             description='Если True, возвращает только сети, где текущий пользователь является автором.'),
+            OpenApiParameter(name='me_in_chain', type=bool,
+                             description='Если True, то возвращает сети в которых находится текущий пользователь.'),
+        ]),
     retrieve=extend_schema(
         summary="Получить детали сети",
         description="Возвращает информацию о конкретной сети по её ID.",
-        tags=['Chain'],
-    ),
+        tags=['Chain'],),
     create=extend_schema(
         summary="Создать новую сеть",
         description="Создает новую сеть.",
         tags=['Chain'],
-        request=PostPatchChainSerializer,
-    ),
+        request=PostPatchChainSerializer,),
     partial_update=extend_schema(
         summary="Частично обновить сеть",
         description="Можно обновить имя или организацию сети по отдельности.",
         tags=['Chain'],
-        request=PostPatchChainSerializer,
-    ),
+        request=PostPatchChainSerializer,),
     destroy=extend_schema(
         summary="Удалить сеть",
         description="Удаляет сеть по её ID.",
+        tags=['Chain'],),
+    add_user_in_chain=extend_schema(
+        summary="Добавить пользователя в сеть",
+        description="Можно добавить пользователя в сеть по ID пользователя и ID сети.",
         tags=['Chain'],
-    ),
+        request=AddUserToChainSerializer,),
+    delete_user_in_chain=extend_schema(
+        summary="Удалить пользователя из сети",
+        description="Удаляет пользователя из сети по ID пользователя и ID сети.",
+        tags=['Chain'],
+        parameters=[
+            OpenApiParameter(name='user_id', type=int,
+                             description='Нужно указать ID пользователя, которого нужно удалить из сети.'),
+            OpenApiParameter(name='chain_id', type=int,
+                             description='Нужно указать ID сети, из которой нужно удалить пользователя.'),
+        ]),
 )
 class ChainViewSet(ModelViewSet):
     queryset = Chain.objects.all()
@@ -209,9 +221,12 @@ class ChainViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         my_chain = request.query_params.get('my_chain', '').lower() == 'true'
+        me_in_chain = request.query_params.get('me_in_chain', '').lower() == 'true'
 
         if my_chain:
             queryset = self.get_queryset().filter(organization__authors=request.user)
+        elif me_in_chain:
+            queryset = self.get_queryset().filter(organization__users=request.user)
         else:
             queryset = self.get_queryset()
 
@@ -250,3 +265,31 @@ class ChainViewSet(ModelViewSet):
             instance._prefetched_objects_cache = {}
 
         return Response(GetChainSerializer(serializer.instance).data)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAuthorInChainOrReadOnly])
+    def add_user_in_chain(self, request) -> Response:
+        serializer = AddUserToChainSerializer(data=request.data, context={'request': request})
+
+        if serializer.is_valid():
+            result = serializer.save()
+            return Response(result, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['delete'], permission_classes=[IsAuthenticated, IsAuthorInChainOrReadOnly])
+    def delete_user_in_chain(self, request):
+        user_id: int = request.query_params.get('user_id')
+        chain_id: int = request.query_params.get('chain_id')
+
+        user = User.objects.get(id=user_id)
+        chain = Chain.objects.get(id=chain_id)
+
+        if request.user not in chain.organization.authors.all():
+            return Response({'error': 'You are not the author of this organization'}, status=status.HTTP_403_FORBIDDEN)
+
+        if chain not in user.chains.all():
+            return Response({'error': 'User not found in this chain'}, status=status.HTTP_404_NOT_FOUND)
+
+        user.chains.remove(chain)
+
+        return Response(GetUserSerializer(user).data, status=status.HTTP_200_OK)
