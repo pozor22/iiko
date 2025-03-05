@@ -10,6 +10,7 @@ from django.contrib.sites.shortcuts import get_current_site
 from django.utils.http import urlsafe_base64_decode
 from django_filters.rest_framework import DjangoFilterBackend
 
+from .api_descriptions import user
 from .models import User, PasswordChangeConfirmation
 from .serializers import (GetUserSerializer, RegistrationUserRequestSerializer,
                           LoginSerializer, LoginWithCodeSerializer,
@@ -22,66 +23,75 @@ from .filters import UserFilter
 @extend_schema_view(
     partial_update=extend_schema(exclude=True),
     list=extend_schema(
-        summary="Получить список пользователей",
-        description="Можно получить список всех пользователей, так же можно фильтровать по ролям, организациям, цепочкам и ресторанам",
+        summary=user["get_user_list"]["summary"],
+        description=user["get_user_list"]["description"],
         tags=['Users'],
         parameters=[
-            OpenApiParameter(name='role', type=int, description='Filter for role, by name', required=False),
-            OpenApiParameter(name='organizations', type=int, description='Filter for organizations, by name', required=False),
-            OpenApiParameter(name='chains', type=int, description='Filter for chains, by name', required=False),
-            OpenApiParameter(name='restaurants', type=int, description='Filter for restaurants, by name', required=False),]),
+            OpenApiParameter(**param) for param in user["get_user_list"]["parameters"]
+        ]
+    ),
     retrieve=extend_schema(
-        summary="Получить одного пользователя",
-        description="Возвращает пользователя по его ID",
-        tags=['Users'],),
+        summary=user["get_user"]["summary"],
+        description=user["get_user"]["description"],
+        tags=['Users'],
+    ),
     create=extend_schema(
-        summary='Регистрация нового пользователя',
-        description="Регистрация нового пользователя, после регистрации на почту придет письмо для подтверждения",
+        summary=user["create_user"]["summary"],
+        description=user["create_user"]["description"],
         tags=['Users'],
-        request=RegistrationUserRequestSerializer,),
+        request=RegistrationUserRequestSerializer,
+    ),
     destroy=extend_schema(
-        summary="Удалить пользователя",
-        description="Удаляет пользователя по её ID.",
-        tags=['Users'],),
+        summary=user["delete_user"]["summary"],
+        description=user["delete_user"]["description"],
+        tags=['Users'],
+    ),
     login_user=extend_schema(
-        summary='Авторизация пользователя',
-        description="Авторизация пользователя по username и паролю",
+        summary=user["login_user"]["summary"],
+        description=user["login_user"]["description"],
         request=LoginSerializer,
-        tags=['Auth']),
+        tags=['Auth']
+    ),
     login_user_with_code=extend_schema(
-        summary='Авторизация пользователя по коду',
-        description="Авторизация пользователя по коду",
+        summary=user["login_user_with_code"]["summary"],
+        description=user["login_user_with_code"]["description"],
         request=LoginWithCodeSerializer,
-        tags=['Auth']),
+        tags=['Auth']
+    ),
     refresh_token=extend_schema(
-        summary='Обновление access и refresh токенов',
-        description='Обновление access и refresh токенов',
+        summary=user["refresh_token"]["summary"],
+        description=user["refresh_token"]["description"],
         request=RefreshTokenSerializer,
-        tags=['Auth']),
+        tags=['Auth']
+    ),
     confirm_password_change=extend_schema(
-        summary='Подтверждение смены пароля по коду',
-        description='Отправляет код, а пароль сохраняет в сессии, после подтверждения кода, пароль меняется',
-        tags=['Auth'],
-        request=ConfirmPasswordChangeSerializer),
+        summary=user["confirm_password_change"]["summary"],
+        description=user["confirm_password_change"]["description"],
+        request=ConfirmPasswordChangeSerializer,
+        tags=['Auth']
+    ),
     resend_code=extend_schema(
-        summary='Повторная отправка кода для смены пароля',
-        description='Повторная отправка кода для смены пароля',
-        tags=['Auth']),
+        summary=user["resend_code"]["summary"],
+        description=user["resend_code"]["description"],
+        tags=['Auth']
+    ),
     email_confirmed=extend_schema(
-        summary='Подтверждение почты и активация пользователя',
-        description='Подтверждение почты и активация пользователя',
-        tags=['Auth']),
+        summary=user["email_confirmed"]["summary"],
+        description=user["email_confirmed"]["description"],
+        tags=['Auth']
+    ),
     change_username_or_email=extend_schema(
-        summary='Смена имени или почты пользователя',
-        description='Можно сменить только имя или только почту, так же можно сменить и имя и почту'
-                'если менять почту, то на новую почту будет отправлено письмо для подтверждения',
-        tags=['Users'],
-        request=ChangeUsernameOrEmail),
+        summary=user["change_username_or_email"]["summary"],
+        description=user["change_username_or_email"]["description"],
+        request=ChangeUsernameOrEmail,
+        tags=['Users']
+    ),
     change_password=extend_schema(
-        summary='Смена пароля пользователя',
-        description='При смене пароля, на почту прийдет код для подтверждения',
-        tags=['Users'],
-        request=ChangePasswordSerializer),
+        summary=user["change_password"]["summary"],
+        description=user["change_password"]["description"],
+        request=ChangePasswordSerializer,
+        tags=['Users']
+    )
 )
 class UserViewSet(ModelViewSet):
     queryset = User.objects.all()

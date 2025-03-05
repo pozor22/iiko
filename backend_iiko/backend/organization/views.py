@@ -8,6 +8,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema
 from core.serializers import GetUserSerializer
 from core.models import User
 
+from .api_descriptions import restaurant, organization, chain
 from .models import Organization, Chain, Restaurant
 from .permissions import IsAuthorOrReadOnly, IsAuthorInChainOrReadOnly, IsAuthorInRestaurantOrReadOnly
 from .serializers import (GetOrganizationSerializer, GetChainSerializer,
@@ -18,53 +19,58 @@ from .serializers import (GetOrganizationSerializer, GetChainSerializer,
 
 @extend_schema_view(
     list=extend_schema(
-        summary="Получить список организаций",
-        description="Возвращает список всех организаций. Но можно указывать только один параметр, два одновременно нельзя",
+        summary=organization["get_list_organizations"]["summary"],
+        description=organization["get_list_organizations"]["description"],
         tags=['Organization'],
         parameters=[
-            OpenApiParameter(name='my_organization', type=bool,
-                             description='Если True, возвращает только организации, где текущий пользователь является автором.'),
-            OpenApiParameter(name='me_in_organization', type=bool,
-                             description='Если True, возвращает только организации, где текущий пользователь находится в организациях.')
-        ]),
+            OpenApiParameter(**param) for param in organization["get_list_organizations"]["parameters"]
+        ]
+    ),
     retrieve=extend_schema(
-        summary="Получить детали организации",
-        description="Возвращает детали конкретной организации по её ID.",
-        tags=['Organization']),
+        summary=organization["get_organization"]["summary"],
+        description=organization["get_organization"]["description"],
+        tags=['Organization'],
+    ),
     create=extend_schema(
-        summary="Создать новую организацию",
-        description="Создает новую организацию.",
-        tags=['Organization']),
+        summary=organization["create_organization"]["summary"],
+        description=organization["create_organization"]["description"],
+        tags=['Organization'],
+    ),
     partial_update=extend_schema(
-        summary="Частично обновить организацию",
-        description="Частично обновляет организацию по её ID.",
-        tags=['Organization']),
+        summary=organization["partial_update_organization"]["summary"],
+        description=organization["partial_update_organization"]["description"],
+        tags=['Organization'],
+    ),
     destroy=extend_schema(
-        summary="Удалить организацию",
-        description="Удаляет организацию по её ID.",
-        tags=['Organization']),
+        summary=organization["delete_organization"]["summary"],
+        description=organization["delete_organization"]["description"],
+        tags=['Organization'],
+    ),
     add_author=extend_schema(
-        summary="Добавить автора в организацию",
-        description="Позволяет текущим авторам добавлять новых авторов в организацию.",
+        summary=organization["add_author"]["summary"],
+        description=organization["add_author"]["description"],
         tags=['Organization'],
-        request=PostAddAuthorOrUserSerializer),
+        request=PostAddAuthorOrUserSerializer,
+    ),
     delete_author=extend_schema(
-        summary="Удалить автора из организации",
-        description="Позволяет удалить текущего пользователя из организации",
-        tags=['Organization']),
-    add_user_in_organization=extend_schema(
-        summary="Добавить пользователя в организацию",
-        description="Позволяет добавить пользователя в организацию по id пользователя и по id организации.",
+        summary=organization["delete_author"]["summary"],
+        description=organization["delete_author"]["description"],
         tags=['Organization'],
-        request=PostAddAuthorOrUserSerializer),
+    ),
+    add_user_in_organization=extend_schema(
+        summary=organization["add_user_in_organization"]["summary"],
+        description=organization["add_user_in_organization"]["description"],
+        tags=['Organization'],
+        request=PostAddAuthorOrUserSerializer,
+    ),
     delete_user_in_organization=extend_schema(
-        summary="Удалить пользователя из организации",
-        description="Позволяет удалить пользователя из организации по id пользователя и по id организации.",
+        summary=organization["delete_user_in_organization"]["summary"],
+        description=organization["delete_user_in_organization"]["description"],
         tags=['Organization'],
         parameters=[
-            OpenApiParameter(name='user_id', type=int, description='ID пользователя'),
-            OpenApiParameter(name='organization_id', type=int, description='ID организации')
-        ]),
+            OpenApiParameter(**param) for param in organization["delete_user_in_organization"]["parameters"]
+        ],
+    ),
 )
 class OrganizationViewSet(ModelViewSet):
     queryset = Organization.objects.all()
@@ -161,48 +167,49 @@ class OrganizationViewSet(ModelViewSet):
 
 @extend_schema_view(
     list=extend_schema(
-        summary="Получить список сетей",
-        description="Возвращает список всех сетей. ",
+        summary=chain["get_list_chains"]["summary"],
+        description=chain["get_list_chains"]["description"],
         tags=['Chain'],
         parameters=[
-            OpenApiParameter(name='my_chain', type=bool,
-                             description='Если True, возвращает только сети, где текущий пользователь является автором.'),
-            OpenApiParameter(name='me_in_chain', type=bool,
-                             description='Если True, то возвращает сети в которых находится текущий пользователь.'),
-        ]),
+            OpenApiParameter(**param) for param in chain["get_list_chains"]["parameters"]
+        ]
+    ),
     retrieve=extend_schema(
-        summary="Получить детали сети",
-        description="Возвращает информацию о конкретной сети по её ID.",
-        tags=['Chain'],),
+        summary=chain["get_chain"]["summary"],
+        description=chain["get_chain"]["description"],
+        tags=['Chain'],
+    ),
     create=extend_schema(
-        summary="Создать новую сеть",
-        description="Создает новую сеть.",
+        summary=chain["create_chain"]["summary"],
+        description=chain["create_chain"]["description"],
         tags=['Chain'],
-        request=PostPatchChainSerializer,),
+        request=PostPatchChainSerializer,
+    ),
     partial_update=extend_schema(
-        summary="Частично обновить сеть",
-        description="Можно обновить имя или организацию сети по отдельности.",
+        summary=chain["partial_update_chain"]["summary"],
+        description=chain["partial_update_chain"]["description"],
         tags=['Chain'],
-        request=PostPatchChainSerializer,),
+        request=PostPatchChainSerializer,
+    ),
     destroy=extend_schema(
-        summary="Удалить сеть",
-        description="Удаляет сеть по её ID.",
-        tags=['Chain'],),
-    add_user_in_chain=extend_schema(
-        summary="Добавить пользователя в сеть",
-        description="Можно добавить пользователя в сеть по ID пользователя и ID сети.",
+        summary=chain["delete_chain"]["summary"],
+        description=chain["delete_chain"]["description"],
         tags=['Chain'],
-        request=AddUserToChainSerializer,),
+    ),
+    add_user_in_chain=extend_schema(
+        summary=chain["add_user_in_chain"]["summary"],
+        description=chain["add_user_in_chain"]["description"],
+        tags=['Chain'],
+        request=AddUserToChainSerializer,
+    ),
     delete_user_in_chain=extend_schema(
-        summary="Удалить пользователя из сети",
-        description="Удаляет пользователя из сети по ID пользователя и ID сети.",
+        summary=chain["delete_user_in_chain"]["summary"],
+        description=chain["delete_user_in_chain"]["description"],
         tags=['Chain'],
         parameters=[
-            OpenApiParameter(name='user_id', type=int,
-                             description='Нужно указать ID пользователя, которого нужно удалить из сети.'),
-            OpenApiParameter(name='chain_id', type=int,
-                             description='Нужно указать ID сети, из которой нужно удалить пользователя.'),
-        ]),
+            OpenApiParameter(**param) for param in chain["delete_user_in_chain"]["parameters"]
+        ],
+    ),
 )
 class ChainViewSet(ModelViewSet):
     queryset = Chain.objects.all()
@@ -298,48 +305,49 @@ class ChainViewSet(ModelViewSet):
 
 @extend_schema_view(
     list=extend_schema(
-        summary="Получить список ресторанов",
-        description="Возвращает список всех ресторанов.",
+        summary=restaurant["get_list_restaurants"]["summary"],
+        description=restaurant["get_list_restaurants"]["description"],
         tags=['Restaurant'],
         parameters=[
-            OpenApiParameter(name='my_restaurant', type=bool,
-                             description='Если True, возвращает только рестораны, где текущий пользователь является автором.'),
-            OpenApiParameter(name='me_in_restaurant', type=bool,
-                             description='Если True, то возвращает рестораны в которых находится текущий пользователь.'),
-        ]),
+            OpenApiParameter(**param) for param in restaurant["get_list_restaurants"]["parameters"]
+        ]
+    ),
     retrieve=extend_schema(
-        summary="Получить детали ресторана",
-        description="Возвращает информацию о конкретной ресторане по её ID.",
-        tags=['Restaurant'],),
+        summary=restaurant["get_restaurant"]["summary"],
+        description=restaurant["get_restaurant"]["description"],
+        tags=['Restaurant'],
+    ),
     create=extend_schema(
-        summary="Создать новый ресторан",
-        description="Создает новый ресторан.",
+        summary=restaurant["create_restaurant"]["summary"],
+        description=restaurant["create_restaurant"]["description"],
         tags=['Restaurant'],
-        request=PostPatchRestaurantSerializer,),
+        request=PostPatchRestaurantSerializer,
+    ),
     partial_update=extend_schema(
-        summary="Частично обновить ресторан",
-        description="Можно обновить имя или сеть ресторана по отдельности.",
+        summary=restaurant["partial_update_restaurant"]["summary"],
+        description=restaurant["partial_update_restaurant"]["description"],
         tags=['Restaurant'],
-        request=PostPatchRestaurantSerializer,),
+        request=PostPatchRestaurantSerializer,
+    ),
     destroy=extend_schema(
-        summary="Удалить ресторан",
-        description="Удаляет ресторан по её ID.",
-        tags=['Restaurant'],),
-    add_user_in_restaurant=extend_schema(
-        summary="Добавить пользователя в ресторан",
-        description="Можно добавить пользователя в ресторан по ID пользователя и ID ресторана.",
+        summary=restaurant["delete_restaurant"]["summary"],
+        description=restaurant["delete_restaurant"]["description"],
         tags=['Restaurant'],
-        request=AddUserToRestaurantSerializer,),
+    ),
+    add_user_in_restaurant=extend_schema(
+        summary=restaurant["add_user_in_restaurant"]["summary"],
+        description=restaurant["add_user_in_restaurant"]["description"],
+        tags=['Restaurant'],
+        request=AddUserToRestaurantSerializer,
+    ),
     delete_user_in_restaurant=extend_schema(
-        summary="Удалить пользователя из ресторана",
-        description="Удаляет пользователя из ресторана по ID пользователя и ID ресторана.",
+        summary=restaurant["delete_user_in_restaurant"]["summary"],
+        description=restaurant["delete_user_in_restaurant"]["description"],
         tags=['Restaurant'],
         parameters=[
-            OpenApiParameter(name='user_id', type=int,
-                             description='Нужно указать ID пользователя, которого нужно удалить из ресторана.'),
-            OpenApiParameter(name='restaurant_id', type=int,
-                             description='Нужно указать ID ресторана, из которой нужно удалить пользователя.'),
-        ]),
+            OpenApiParameter(**param) for param in restaurant["delete_user_in_restaurant"]["parameters"]
+        ],
+    ),
 )
 class RestaurantViewSet(ModelViewSet):
     queryset = Restaurant.objects.all()
