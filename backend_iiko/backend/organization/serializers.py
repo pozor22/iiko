@@ -124,6 +124,51 @@ class AddUserToChainSerializer(serializers.Serializer):
 
 
 class GetRestaurantSerializer(serializers.ModelSerializer):
+    chain = GetChainSerializer()
+
     class Meta:
         model = Restaurant
-        fields = '__all__'
+        fields = ['id', 'name', 'chain']
+
+
+class PostPatchRestaurantSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Restaurant
+        fields = ['id', 'name', 'chain']
+
+
+class AddUserToRestaurantSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    restaurant_id = serializers.IntegerField()
+
+    def validate(self, value):
+        user_id = value.get('user_id')
+        restaurant_id = value.get('restaurant_id')
+        self_user = self.context['request'].user
+
+        user = User.objects.filter(id=user_id).first()
+        restaurant = Restaurant.objects.filter(id=restaurant_id).first()
+
+        if user is None:
+            raise serializers.ValidationError('User not found')
+
+        if restaurant is None:
+            raise serializers.ValidationError('Restaurant not found')
+
+        if self_user not in restaurant.chain.organization.authors.all():
+            raise serializers.ValidationError('You are not an author of this organization')
+
+        return value
+
+
+    def create(self, validated_data):
+        user = User.objects.get(id=validated_data.get('user_id'))
+        restaurant = Restaurant.objects.get(id=validated_data.get('restaurant_id'))
+
+        user.restaurants.add(restaurant)
+
+        return {
+            'user': GetUserSerializer(user).data,
+            'restaurant': GetRestaurantSerializer(restaurant).data
+        }

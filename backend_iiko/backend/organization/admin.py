@@ -30,6 +30,13 @@ class ChainAdmin(admin.ModelAdmin):
     ordering = ('id',)
 
 
+class RestaurantAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'chain')
+    list_filter = ('chain',)
+    search_fields = ('name',)
+    ordering = ('id',)
+
+
 admin.site.register(Organization, OrganizationAdmin)
 admin.site.register(Chain, ChainAdmin)
-admin.site.register(Restaurant)
+admin.site.register(Restaurant, RestaurantAdmin)

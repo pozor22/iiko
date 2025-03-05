@@ -9,10 +9,11 @@ from core.serializers import GetUserSerializer
 from core.models import User
 
 from .models import Organization, Chain, Restaurant
-from .permissions import IsAuthorOrReadOnly, IsAuthorInChainOrReadOnly
+from .permissions import IsAuthorOrReadOnly, IsAuthorInChainOrReadOnly, IsAuthorInRestaurantOrReadOnly
 from .serializers import (GetOrganizationSerializer, GetChainSerializer,
-                          GetRestaurantSerializer, PostAddAuthorOrUserSerializer,
-                          PostPatchChainSerializer, AddUserToChainSerializer)
+                          PostAddAuthorOrUserSerializer, PostPatchChainSerializer,
+                          AddUserToChainSerializer, GetRestaurantSerializer,
+                          PostPatchRestaurantSerializer, AddUserToRestaurantSerializer)
 
 
 @extend_schema_view(
@@ -291,5 +292,144 @@ class ChainViewSet(ModelViewSet):
             return Response({'error': 'User not found in this chain'}, status=status.HTTP_404_NOT_FOUND)
 
         user.chains.remove(chain)
+
+        return Response(GetUserSerializer(user).data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Получить список ресторанов",
+        description="Возвращает список всех ресторанов.",
+        tags=['Restaurant'],
+        parameters=[
+            OpenApiParameter(name='my_restaurant', type=bool,
+                             description='Если True, возвращает только рестораны, где текущий пользователь является автором.'),
+            OpenApiParameter(name='me_in_restaurant', type=bool,
+                             description='Если True, то возвращает рестораны в которых находится текущий пользователь.'),
+        ]),
+    retrieve=extend_schema(
+        summary="Получить детали ресторана",
+        description="Возвращает информацию о конкретной ресторане по её ID.",
+        tags=['Restaurant'],),
+    create=extend_schema(
+        summary="Создать новый ресторан",
+        description="Создает новый ресторан.",
+        tags=['Restaurant'],
+        request=PostPatchRestaurantSerializer,),
+    partial_update=extend_schema(
+        summary="Частично обновить ресторан",
+        description="Можно обновить имя или сеть ресторана по отдельности.",
+        tags=['Restaurant'],
+        request=PostPatchRestaurantSerializer,),
+    destroy=extend_schema(
+        summary="Удалить ресторан",
+        description="Удаляет ресторан по её ID.",
+        tags=['Restaurant'],),
+    add_user_in_restaurant=extend_schema(
+        summary="Добавить пользователя в ресторан",
+        description="Можно добавить пользователя в ресторан по ID пользователя и ID ресторана.",
+        tags=['Restaurant'],
+        request=AddUserToRestaurantSerializer,),
+    delete_user_in_restaurant=extend_schema(
+        summary="Удалить пользователя из ресторана",
+        description="Удаляет пользователя из ресторана по ID пользователя и ID ресторана.",
+        tags=['Restaurant'],
+        parameters=[
+            OpenApiParameter(name='user_id', type=int,
+                             description='Нужно указать ID пользователя, которого нужно удалить из ресторана.'),
+            OpenApiParameter(name='restaurant_id', type=int,
+                             description='Нужно указать ID ресторана, из которой нужно удалить пользователя.'),
+        ]),
+)
+class RestaurantViewSet(ModelViewSet):
+    queryset = Restaurant.objects.all()
+    serializer_class = GetRestaurantSerializer
+    permission_classes = [IsAuthenticated, IsAuthorInRestaurantOrReadOnly]
+    http_method_names = ['get', 'post', 'patch', 'delete']
+
+    def get_serializer_class(self):
+        if self.action == 'create' or self.action == 'partial_update':
+            return PostPatchRestaurantSerializer
+        return GetRestaurantSerializer
+
+    def get_object(self):
+        obj = super().get_object()
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+    def list(self, request, *args, **kwargs):
+        my_restaurant = request.query_params.get('my_restaurant', '').lower() == 'true'
+        me_in_restaurant = request.query_params.get('me_in_restaurant', '').lower() == 'true'
+
+        if my_restaurant:
+            queryset = self.get_queryset().filter(chain__organization__authors=request.user)
+        elif me_in_restaurant:
+            queryset = self.get_queryset().filter(chain__organization__users=request.user)
+        else:
+            queryset = self.get_queryset()
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        chain_id = request.data.get('chain')
+
+        chain = Chain.objects.get(id=chain_id)
+
+        if Organization.objects.filter(id=chain.organization.id, authors=request.user).exists():
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            user = request.user
+            user.restaurants.add(serializer.instance)
+            return Response(GetRestaurantSerializer(serializer.instance).data, status=status.HTTP_201_CREATED, headers=headers)
+        else:
+            return Response({'error': 'You are not an author of this organization'}, status=status.HTTP_403_FORBIDDEN)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(GetRestaurantSerializer(serializer.instance).data)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAuthorInRestaurantOrReadOnly])
+    def add_user_in_restaurant(self, request) -> Response:
+        serializer = AddUserToRestaurantSerializer(data=request.data, context={'request': request})
+
+        if serializer.is_valid():
+            result = serializer.save()
+            return Response(result, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['delete'], permission_classes=[IsAuthenticated, IsAuthorInRestaurantOrReadOnly])
+    def delete_user_in_restaurant(self, request):
+        user_id: int = request.query_params.get('user_id')
+        restaurant_id: int = request.query_params.get('restaurant_id')
+
+        user = User.objects.get(id=user_id)
+        restaurant = Restaurant.objects.get(id=restaurant_id)
+
+        if request.user not in restaurant.chain.organization.authors.all():
+            return Response({'error': 'You are not the author of this organization'}, status=status.HTTP_403_FORBIDDEN)
+
+        if restaurant not in user.restaurants.all():
+            return Response({'error': 'User not found in this chain'}, status=status.HTTP_404_NOT_FOUND)
+
+        user.restaurants.remove(restaurant)
 
         return Response(GetUserSerializer(user).data, status=status.HTTP_200_OK)
