@@ -1,3 +1,5 @@
+from drf_spectacular.utils import OpenApiParameter
+
 user = {
     "get_user_list": {
         "summary": "Получить список пользователей",
@@ -67,7 +69,23 @@ user = {
     },
     "email_confirmed": {
         "summary": "Подтверждение почты и активация пользователя",
-        "description": "Подтверждение почты и активация пользователя"
+        "description": "Подтверждение почты и активация пользователя",
+        "parameters": [
+            {
+                "name": "uidb64",
+                "type": "str",
+                "description": "Base64-encoded user ID",
+                "required": True,
+                "location": OpenApiParameter.QUERY
+            },
+            {
+                "name": "token",
+                "type": "str",
+                "description": "Token for email confirmation",
+                "required": True,
+                "location": OpenApiParameter.QUERY
+            },
+        ]
     },
     "change_username_or_email": {
         "summary": "Смена имени или почты пользователя",

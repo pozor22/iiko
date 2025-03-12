@@ -1,4 +1,5 @@
 import django_filters
+
 from .models import User
 
 class UserFilter(django_filters.FilterSet):
@@ -8,5 +9,5 @@ class UserFilter(django_filters.FilterSet):
     restaurants = django_filters.CharFilter(field_name='restaurants__name', lookup_expr='icontains')
 
     class Meta:
-            model = User
-            fields = ['role', 'organizations', 'chains', 'restaurants']
+        model = User
+        fields = ['role', 'organizations', 'chains', 'restaurants']

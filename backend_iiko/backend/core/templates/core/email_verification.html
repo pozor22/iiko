@@ -1,5 +1,13 @@
 Привет {{ user.username }},
 Спасибо за регистрацию на нашем сайте!
 Пожалуйста, нажмите на ссылку ниже, чтобы активировать ваш аккаунт:
-http://{{ domain }}{% url 'confirm_email' uidb64=uid token=token %}
-С уважением, Команда VovaIiko
+
+<a href="http://localhost:3000/confirm-email/{{ uid }}/{{ token }}/">
+    Активировать аккаунт
+</a>
+
+Или скопируйте ссылку и вставьте в браузер:
+http://localhost:3000/confirm-email/{{ uid }}/{{ token }}/
+
+С уважением,
+Команда VovaIiko

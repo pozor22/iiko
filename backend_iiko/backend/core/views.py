@@ -78,6 +78,13 @@ from .filters import UserFilter
     email_confirmed=extend_schema(
         summary=user["email_confirmed"]["summary"],
         description=user["email_confirmed"]["description"],
+        parameters=[
+            OpenApiParameter(name="uidb64", type=str, location=OpenApiParameter.QUERY,
+                             description="Base64-encoded user ID"),
+            OpenApiParameter(name="token", type=str, location=OpenApiParameter.QUERY,
+                             description="Token for email confirmation"),
+        ],
+        request=None,
         tags=['Auth']
     ),
     change_username_or_email=extend_schema(
@@ -105,9 +112,7 @@ class UserViewSet(ModelViewSet):
         if serializer.is_valid():
             user = serializer.save()
 
-            current_site = get_current_site(request)
-            domain = current_site.domain
-            send_email_active_account.delay(user.id, domain)
+            send_email_active_account.delay(user.id)
 
             response = GetUserSerializer(user)
 
@@ -172,7 +177,10 @@ class UserViewSet(ModelViewSet):
         return Response({'message': 'Код подтверждения отправлен на email'}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'])
-    def email_confirmed(self, request, uidb64, token):
+    def email_confirmed(self, request):
+        uidb64 = request.query_params.get('uidb64')
+        token = request.query_params.get('token')
+
         try:
             uid = urlsafe_base64_decode(uidb64)
             user = User.objects.get(pk=uid)

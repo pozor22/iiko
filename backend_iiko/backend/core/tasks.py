@@ -10,14 +10,13 @@ from .models import User
 
 
 @shared_task
-def send_email_active_account(user_id, domain):
+def send_email_active_account(user_id):
     try:
         user = User.objects.get(id=user_id)
 
         mail_subject = 'Подтвердите ваш аккаунт'
         message = render_to_string('core/email_verification.html', {
             'user': user,
-            'domain': domain,
             'uid': urlsafe_base64_encode(force_bytes(user.pk)),
             'token': default_token_generator.make_token(user),
         })
