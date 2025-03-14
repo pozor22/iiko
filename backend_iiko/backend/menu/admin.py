@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, Kitchen, Product
+from .models import Category, Kitchen, Ingredient
 
 
 class CategoryAdmin(admin.ModelAdmin):
@@ -23,6 +23,12 @@ class KitchenAdmin(admin.ModelAdmin):
     get_restaurant.short_description = 'Restaurant'
 
 
+class IngredientAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'count', 'unit', 'chain')
+    list_filter = ('chain',)
+    search_fields = ('name',)
+
+
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(Kitchen, KitchenAdmin)
-admin.site.register(Product)
+admin.site.register(Ingredient, IngredientAdmin)

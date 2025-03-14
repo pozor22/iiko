@@ -4,21 +4,6 @@ from django.contrib.auth.models import Permission
 from .models import User
 
 
-class OrganizationInline(admin.TabularInline):
-    model = User.organizations.through
-    extra = 1
-
-
-class ChainInline(admin.TabularInline):
-    model = User.chains.through
-    extra = 1
-
-
-class RestaurantInline(admin.TabularInline):
-    model = User.restaurants.through
-    extra = 1
-
-
 class UserAdmin(admin.ModelAdmin):
     list_display = ('id', 'username', 'email', 'get_organization', 'get_chain', 'get_restaurant')
     list_filter = ('organizations', 'chains', 'restaurants')
@@ -30,9 +15,8 @@ class UserAdmin(admin.ModelAdmin):
         ('Дополнительная информация', {'fields': ('code',)}),
         ('Группы и права', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Даты', {'fields': ('last_login', 'date_joined')}),
+        ('Организации', {'fields': ('organizations', 'chains', 'restaurants')}),
     )
-
-    inlines = [OrganizationInline, ChainInline, RestaurantInline]
 
     filter_horizontal = ('organizations', 'chains', 'restaurants', 'groups', 'user_permissions')
 
