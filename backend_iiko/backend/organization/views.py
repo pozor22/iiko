@@ -1,3 +1,4 @@
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -8,7 +9,10 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema
 from core.serializers import GetUserSerializer
 from core.models import User
 
-from .api_descriptions import restaurant, organization, chain
+from backend.viewsets import MyModelViewSet
+
+from .filters import ChainFilter
+from .api_descriptions import restaurant, organization, chain_des
 from .models import Organization, Chain, Restaurant
 from .permissions import IsAuthorOrReadOnly, IsAuthorInChainOrReadOnly, IsAuthorInRestaurantOrReadOnly
 from .serializers import (GetOrganizationSerializer, GetChainSerializer,
@@ -72,25 +76,11 @@ from .serializers import (GetOrganizationSerializer, GetChainSerializer,
         ],
     ),
 )
-class OrganizationViewSet(ModelViewSet):
+class OrganizationViewSet(MyModelViewSet):
     queryset = Organization.objects.all()
     serializer_class = GetOrganizationSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
     http_method_names = ['get', 'post', 'patch', 'delete']
-
-    def get_object(self):
-        obj = super().get_object()
-        self.check_object_permissions(self.request, obj)
-        return obj
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        user = request.user
-        user.organizations.add(serializer.instance)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def list(self, request, *args, **kwargs):
         my_organization: bool = request.query_params.get('my_organization', '').lower() == 'true'
@@ -167,125 +157,67 @@ class OrganizationViewSet(ModelViewSet):
 
 @extend_schema_view(
     list=extend_schema(
-        summary=chain["get_list_chains"]["summary"],
-        description=chain["get_list_chains"]["description"],
+        summary=chain_des["get_list_chains"]["summary"],
+        description=chain_des["get_list_chains"]["description"],
         tags=['Chain'],
-        parameters=[
-            OpenApiParameter(**param) for param in chain["get_list_chains"]["parameters"]
-        ]
     ),
     retrieve=extend_schema(
-        summary=chain["get_chain"]["summary"],
-        description=chain["get_chain"]["description"],
+        summary=chain_des["get_chain"]["summary"],
+        description=chain_des["get_chain"]["description"],
         tags=['Chain'],
     ),
     create=extend_schema(
-        summary=chain["create_chain"]["summary"],
-        description=chain["create_chain"]["description"],
+        summary=chain_des["create_chain"]["summary"],
+        description=chain_des["create_chain"]["description"],
         tags=['Chain'],
-        request=PostPatchChainSerializer,
     ),
     partial_update=extend_schema(
-        summary=chain["partial_update_chain"]["summary"],
-        description=chain["partial_update_chain"]["description"],
+        summary=chain_des["partial_update_chain"]["summary"],
+        description=chain_des["partial_update_chain"]["description"],
         tags=['Chain'],
-        request=PostPatchChainSerializer,
     ),
     destroy=extend_schema(
-        summary=chain["delete_chain"]["summary"],
-        description=chain["delete_chain"]["description"],
+        summary=chain_des["delete_chain"]["summary"],
+        description=chain_des["delete_chain"]["description"],
         tags=['Chain'],
     ),
     add_user_in_chain=extend_schema(
-        summary=chain["add_user_in_chain"]["summary"],
-        description=chain["add_user_in_chain"]["description"],
+        summary=chain_des["add_user_in_chain"]["summary"],
+        description=chain_des["add_user_in_chain"]["description"],
         tags=['Chain'],
         request=AddUserToChainSerializer,
     ),
     delete_user_in_chain=extend_schema(
-        summary=chain["delete_user_in_chain"]["summary"],
-        description=chain["delete_user_in_chain"]["description"],
+        summary=chain_des["delete_user_in_chain"]["summary"],
+        description=chain_des["delete_user_in_chain"]["description"],
         tags=['Chain'],
         parameters=[
-            OpenApiParameter(**param) for param in chain["delete_user_in_chain"]["parameters"]
+            OpenApiParameter(**param) for param in chain_des["delete_user_in_chain"]["parameters"]
         ],
     ),
 )
-class ChainViewSet(ModelViewSet):
+class ChainViewSet(MyModelViewSet):
     queryset = Chain.objects.all()
     serializer_class = GetChainSerializer
     permission_classes = [IsAuthenticated, IsAuthorInChainOrReadOnly]
     http_method_names = ['get', 'post', 'patch', 'delete']
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ChainFilter
 
     def get_serializer_class(self):
         if self.action == 'create' or self.action == 'partial_update':
             return PostPatchChainSerializer
         return GetChainSerializer
 
-    def get_object(self):
-        obj = super().get_object()
-        self.check_object_permissions(self.request, obj)
-        return obj
-
-    def list(self, request, *args, **kwargs):
-        my_chain = request.query_params.get('my_chain', '').lower() == 'true'
-        me_in_chain = request.query_params.get('me_in_chain', '').lower() == 'true'
-
-        if my_chain:
-            queryset = self.get_queryset().filter(organization__authors=request.user)
-        elif me_in_chain:
-            queryset = self.get_queryset().filter(organization__users=request.user)
-        else:
-            queryset = self.get_queryset()
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
-    def create(self, request, *args, **kwargs):
-        organization_id = request.data.get('organization')
-
-        if Organization.objects.filter(id=organization_id, authors=request.user).exists():
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
-            headers = self.get_success_headers(serializer.data)
-            user = request.user
-            user.chains.add(serializer.instance)
-            return Response(GetChainSerializer(serializer.instance).data, status=status.HTTP_201_CREATED, headers=headers)
-        else:
-            return Response({'error': 'You are not an author of this organization'}, status=status.HTTP_403_FORBIDDEN)
-
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-
-        if getattr(instance, '_prefetched_objects_cache', None):
-            # If 'prefetch_related' has been applied to a queryset, we need to
-            # forcibly invalidate the prefetch cache on the instance.
-            instance._prefetched_objects_cache = {}
-
-        return Response(GetChainSerializer(serializer.instance).data)
-
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAuthorInChainOrReadOnly])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def add_user_in_chain(self, request) -> Response:
         serializer = AddUserToChainSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(GetUserSerializer(serializer.instance).data, status=status.HTTP_200_OK)
 
-        if serializer.is_valid():
-            result = serializer.save()
-            return Response(result, status=status.HTTP_200_OK)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=False, methods=['delete'], permission_classes=[IsAuthenticated, IsAuthorInChainOrReadOnly])
-    def delete_user_in_chain(self, request):
+    @action(detail=False, methods=['delete'], permission_classes=[IsAuthenticated])
+    def delete_user_in_chain(self, request) -> Response:
         user_id: int = request.query_params.get('user_id')
         chain_id: int = request.query_params.get('chain_id')
 

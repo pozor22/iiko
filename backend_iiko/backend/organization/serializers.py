@@ -86,6 +86,17 @@ class PostPatchChainSerializer(serializers.ModelSerializer):
         model = Chain
         fields = ['id', 'name', 'organization']
 
+    def create(self, validated_data):
+        user = self.context['request'].user
+        organization = validated_data.get('organization')
+
+        if user not in organization.authors.all():
+            raise serializers.ValidationError('You are not an author of this organization')
+
+        chain = Chain.objects.create(**validated_data)
+        user.chains.add(chain)
+        return chain
+
 
 class AddUserToChainSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()
@@ -108,6 +119,9 @@ class AddUserToChainSerializer(serializers.Serializer):
         if self_user not in chain.organization.authors.all():
             raise serializers.ValidationError('You are not an author of this organization')
 
+        if chain in self_user.chains.all():
+            raise serializers.ValidationError('User already in this chain')
+
         return value
 
 
@@ -117,10 +131,7 @@ class AddUserToChainSerializer(serializers.Serializer):
 
         user.chains.add(chain)
 
-        return {
-            'user': GetUserSerializer(user).data,
-            'chain': GetChainSerializer(chain).data
-        }
+        return user
 
 
 class GetRestaurantSerializer(serializers.ModelSerializer):

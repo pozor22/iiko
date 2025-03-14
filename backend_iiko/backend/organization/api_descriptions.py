@@ -121,22 +121,10 @@ organization = {
     }
 }
 
-chain = {
+chain_des = {
     "get_list_chains": {
         "summary": "Получить список сетей",
-        "description": "Возвращает список всех сетей.",
-        "parameters": [
-            {
-                "name": "my_chain",
-                "type": "bool",
-                "description": "Если True, возвращает только сети, где текущий пользователь является автором."
-            },
-            {
-                "name": "me_in_chain",
-                "type": "bool",
-                "description": "Если True, возвращает сети, в которых находится текущий пользователь."
-            }
-        ]
+        "description": "Возвращает список всех сетей. Доступна фильтрация по параметрам.",
     },
     "get_chain": {
         "summary": "Получить детали сети",
