@@ -196,6 +196,7 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API for iiko",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    'COMPONENT_SPLIT_REQUEST': True,
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,  # Сохранять токен после обновления страницы
         "deepLinking": True,

@@ -148,6 +148,17 @@ class PostPatchRestaurantSerializer(serializers.ModelSerializer):
         model = Restaurant
         fields = ['id', 'name', 'chain']
 
+    def create(self, validated_data):
+        user = self.context['request'].user
+        chain = validated_data.get('chain')
+
+        if user not in chain.organization.authors.all():
+            raise serializers.ValidationError('You are not an author of this organization')
+
+        restaurant = Restaurant.objects.create(**validated_data)
+        user.restaurants.add(restaurant)
+        return restaurant
+
 
 class AddUserToRestaurantSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()
@@ -181,5 +192,4 @@ class AddUserToRestaurantSerializer(serializers.Serializer):
 
         return {
             'user': GetUserSerializer(user).data,
-            'restaurant': GetRestaurantSerializer(restaurant).data
         }
